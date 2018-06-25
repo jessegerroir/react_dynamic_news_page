@@ -27,6 +27,48 @@ const list = [
 //if it matches you return true and the item stays. If it doesn't then the item is removed.
 const isSearched = (searchTerm) => (item) => item.title.toLowerCase().includes(searchTerm.toLowerCase());
 
+class Search extends Component {
+    render(){
+        const { value, onChange, children } = this.props;
+        return(
+            <form>
+                {children}
+                <input
+                    type="text"
+                    value={value}
+                    onChange={this.onSearchChange}
+                />
+            </form>
+        );
+    }
+}
+
+class Table extends Component{
+    render(){
+        const{  list, pattern, onDismiss } = this.props;
+        return(
+            <div>
+                {list.filter(isSearched(pattern)).map(item =>
+                    <div key={item.objectID}>
+                        <span>
+                            <a href={item.title}>{item.title}</a>
+                        </span>
+                        <span>{item.author}</span>
+                        <span>{item.num_comments}</span>
+                        <span>{item.points}</span>
+                        <span>
+                            <button onClick={()=> this.onDismiss()}
+                                    type="button"
+                            >
+                            Dismiss
+                            </button>
+                        </span>
+                    </div>
+                )}
+            </div>
+        );
+    }
+}
 
 class App extends Component {
     constructor(props){
@@ -54,35 +96,25 @@ class App extends Component {
 
     //whenever there is change, the render is called to re-render the view
     render() {
-        const helloWorld = 'Welcome to the Road to learn React';
-        const person = {firstName: 'James', lastName: 'Smith'};
+        //we use deconstruction here so we don't have to type out this.state everytime we want to access a variable
+        const {
+            searchTerm,
+            list
+        } = this.state;
         return (
             <div className="App">
-                <form>
-                    <input type="text"
-                        onChange={this.onSearchChange}
-                    />
-                </form>
-                {this.state.list.filter(isSearched(this.state.SearchTerm)).map(item =>
-                    ...
-                )}
-                {this.state.list.map(item =>
-                    <div key={item.objectID}>
-                        <span>
-                            <a href={item.title}>{item.title}</a>
-                        </span>
-                        <span>{item.author}</span>
-                        <span>{item.num_comments}</span>
-                        <span>{item.points}</span>
-                        <span>
-                            <button onClick={()=> this.onDismiss()}
-                             type="button"
-                            >
-                            Dismiss
-                            </button>
-                        </span>
-                    </div>
-                )}
+
+                <Search
+                    value={searchTerm}
+                    onChange={this.onSearchChange}
+                >
+                    Search
+                </Search>
+                <Table
+                    list={list}
+                    pattern={searchTerm}
+                    onDismiss={this.onDismiss}
+                />
             </div>
         );
     }
