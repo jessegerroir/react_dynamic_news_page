@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import logo from './logo.svg';
+import axios from 'axios';
 import './App.css';
 
 const DEFAULT_QUERY = 'redux';
@@ -74,14 +74,19 @@ const Search = ({  value, onChange, onSubmit, children }) =>
 
 
 class App extends Component {
+    //this allows us to shutdown calls if lifecycle is interrupted
+    _isMounted = false;
     constructor(props){
         super(props);
         //this allows us to store the list internally so we can update and change it
         this.state ={
-            result: null,
+            results: null,
+            searchKey: '',
             searchTerm: DEFAULT_QUERY,
+            error: null,
         };
 
+        this.needsToSearchTopStories = this.needsToSearchTopStories.bind(this);
         this.setSearchTopStories = this.setSearchTopStories.bind(this);
         //binding the button event handler, we have to bind it so it can use 'this' state
         this.onDismiss = this.onDismiss.bind(this);
@@ -90,43 +95,69 @@ class App extends Component {
         this.fetchSearchTopStories = this.fetchSearchTopStories.bind(this);
     }
 
+    //if the component mounted (rendered fine) fetch data to fill it?
+    componentDidMount(){
+        this._isMounted = true;
+        const { searchTerm } = this.state;
+        this.setState({ searchKey: searchTerm });
+        this.fetchSearchTopStories(searchTerm);
+    }
+
+    componentWillUnmount(){
+        this._isMounted = false;
+    }
+
+    needsToSearchTopStories(searchTerm){
+        return !this.state.results[searchTerm];
+    }
+
     onSearchSubmit(event){
         const { searchTerm } = this.state;
-        this.fetchSearchTopStories(searchTerm);
+        this.setState({ searchKey: searchTerm });
+        //go fetch the top stories
+        if(this.needsToSearchTopStories(searchTerm)) {
+            this.fetchSearchTopStories(searchTerm);
+        }
         event.preventDefault();
     }
 
+    //use the url to fetch execute the code and fetch the resources and return json
     fetchSearchTopStories(searchTerm, page = 0){
-        //use the url to fetch execute the code and fetch the resources and return json
-        fetch(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}&${PARAM_PAGE}${page}&${PARAM_HPP}${DEFAULT_HPP}`)
-            .then(response => response.json())
-            .then(result => this.setSearchTopStories(result))
-            .catch(error => error);
+        axios(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}&${PARAM_PAGE}${page}&${PARAM_HPP}${DEFAULT_HPP}`)
+            .then(result => this._isMounted && this.setSearchTopStories(result.data))
+            .catch(error => this._isMounted && this.setState({ error }));
     }
 
     //we are concatenating the old and new list when searching this helps for pagination
     setSearchTopStories(result){
         const { hits, page } = result;
-        const oldHits = page !== 0 ? this.state.result.hits : [];
+        const { searchKey, results } = this.state;
+        //if we have results return the old ones if we have them already, otherwise return empty
+        const oldHits = results && results[searchKey] ? results[searchKey].hits : [];
         const updatedHits = [...oldHits, ...hits];
 
+        //instead of altering the object directly we create a new result that is added to previous object
         this.setState({
-            result: { hits: updatedHits, page}
+            results: {
+                ...results, [searchKey]: { hits: updatedHits, page}
+            }
         });
     }
 
-    //if the component mounted (rendered fine) fetch data to fill it?
-    componentDidMount(){
-        const { searchTerm } = this.state;
-        this.fetchSearchTopStories(searchTerm);
-    }
-
     onDismiss(id){
+        const { searchKey, results } = this.state;
+        const { hits, page } = results[searchKey];
+
         const isNotId = item => item.objectID !== id;
-        const updatedHits = this.state.result.hits.filter(isNotId);
+        const updatedHits = hits.filter(isNotId);
+
         //instead of altering the object directly we create a new result that is added to previous object
+        //the returned information is stored under the word we used to search
         this.setState({
-            result: {...this.state.result, hits: updatedHits}
+            results: {
+                ...results,
+                [searchKey]: { hits: updatedHits, page}
+            }
         });
     }
 
@@ -137,8 +168,15 @@ class App extends Component {
     //whenever there is change, the render is called to re-render the view
     render() {
         //we use deconstruction here so we don't have to type out this.state everytime we want to access a variable
-        const { searchTerm, result } = this.state;
-        const page = (result && result.page) || 0;
+        const { searchTerm, results, searchKey, error } = this.state;
+        const page = (results && results[searchKey] && results[searchKey].page) || 0;
+        const list = (results && results[searchKey] && results[searchKey].hits) || [];
+
+        //error handling
+        if(error){
+            return <p>Something went wrong!</p>;
+        }
+
         return (
             <div className="page">
                 <div className="App">
@@ -151,14 +189,14 @@ class App extends Component {
                             Search
                         </Search>
                     </div>
-                    {result &&
-                    <Table
-                        list={result.hits}
-                        onDismiss={this.onDismiss}
-                    />
+                    {error ? <div className="interactions"><p>Something went wrong</p></div> :
+                        <Table
+                            list={list}
+                            onDismiss={this.onDismiss}
+                        />
                     }
                     <div className="interactions">
-                        <Button onClick={() => this.fetchSearchTopStories(searchTerm, page + 1)}>
+                        <Button onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}>
                             More
                         </Button>
                     </div>
