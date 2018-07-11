@@ -207,3 +207,10 @@ class App extends Component {
 }
 
 export default App;
+
+//exporting the components we made so they can be used elsewhere
+export {
+  Button,
+  Search,
+  Table,
+};
