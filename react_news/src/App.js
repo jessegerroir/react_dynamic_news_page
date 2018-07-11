@@ -17,16 +17,6 @@ const PARAM_HPP = 'hitsPerPage=';
 //if it matches you return true and the item stays. If it doesn't then the item is removed.
 const isSearched = (searchTerm) => (item) => item.title.toLowerCase().includes(searchTerm.toLowerCase());
 
-const search = ({ value, onChange, children }) =>
-    <form>
-        {children}
-        <input
-            type="text"
-            value={value}
-            onChange={this.onSearchChange}
-        />
-    </form>;
-
 const Table = ({  list, pattern, onDismiss }) =>
     <div className="table">
         {list.map(item =>
@@ -64,13 +54,46 @@ const Button = ({onClick, className = "", children, }) =>
         {children}
     </button>;
 
-const Search = ({  value, onChange, onSubmit, children }) =>
-    <form onSubmit={onSubmit}>
-        <input type="text" value={value} onChange={onChange} />
-        <button type="submit">
-            {children}
-        </button>
-    </form>;
+class Search extends Component{
+    //this puts focus on the search box when the component mounts using the DOM API
+    componentDidMount(){
+        if(this.input){
+            this.input.focus();
+        }
+    }
+
+    render(){
+        const {
+            value,
+            onChange,
+            onSubmit,
+            children
+        } = this.props;
+        return (
+            <form onSubmit={onSubmit}>
+                <input
+                    type="text"
+                    value={value}
+                    onChange={onChange}
+                    ref={(node) => { this.input = node; }}
+                />
+                <button type="submit">
+                    {children}
+                </button>
+            </form>
+        );
+    }
+}
+
+const Loading = () => <div>Loading...</div>;
+
+//higher order component
+const withLoading = (Component) => ({ isLoading, ...rest}) =>
+        isLoading
+        ? <Loading />
+        : <Component { ...rest } />;
+
+const ButtonWithLoading = withLoading(Button);
 
 
 class App extends Component {
@@ -84,6 +107,7 @@ class App extends Component {
             searchKey: '',
             searchTerm: DEFAULT_QUERY,
             error: null,
+            isLoading: false,
         };
 
         this.needsToSearchTopStories = this.needsToSearchTopStories.bind(this);
@@ -123,6 +147,9 @@ class App extends Component {
 
     //use the url to fetch execute the code and fetch the resources and return json
     fetchSearchTopStories(searchTerm, page = 0){
+        //set load to true to display loading screen
+        this.setState({ isLoading: true });
+
         axios(`${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}&${PARAM_PAGE}${page}&${PARAM_HPP}${DEFAULT_HPP}`)
             .then(result => this._isMounted && this.setSearchTopStories(result.data))
             .catch(error => this._isMounted && this.setState({ error }));
@@ -140,7 +167,8 @@ class App extends Component {
         this.setState({
             results: {
                 ...results, [searchKey]: { hits: updatedHits, page}
-            }
+            },
+            isLoading: false
         });
     }
 
@@ -168,14 +196,9 @@ class App extends Component {
     //whenever there is change, the render is called to re-render the view
     render() {
         //we use deconstruction here so we don't have to type out this.state everytime we want to access a variable
-        const { searchTerm, results, searchKey, error } = this.state;
+        const { searchTerm, results, searchKey, error, isLoading } = this.state;
         const page = (results && results[searchKey] && results[searchKey].page) || 0;
         const list = (results && results[searchKey] && results[searchKey].hits) || [];
-
-        //error handling
-        if(error){
-            return <p>Something went wrong!</p>;
-        }
 
         return (
             <div className="page">
@@ -196,9 +219,11 @@ class App extends Component {
                         />
                     }
                     <div className="interactions">
-                        <Button onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}>
-                            More
-                        </Button>
+
+                            <ButtonWithLoading isLoading={isLoading} onClick={() => this.fetchSearchTopStories(searchKey, page + 1)}>
+                                More
+                            </ButtonWithLoading>
+
                     </div>
                 </div>
             </div>
